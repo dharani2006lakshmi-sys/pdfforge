@@ -23,7 +23,7 @@ const upload = multer({
 })
 
 // Process PDF with a tool
-router.post('/process', optionalAuth, upload.array('file_', 10), async (req, res) => {
+router.post('/process', optionalAuth, upload.any(), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files provided' })
