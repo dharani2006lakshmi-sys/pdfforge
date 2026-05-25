@@ -6,6 +6,3 @@ compatibility_flags = ["nodejs_compat"]
 [build]
 command = "npm install"
 
-[[routes]]
-pattern = "pdfforge.example.com/*"
-zone_name = "example.com"
