@@ -4,7 +4,7 @@
  */
 
 const RATE_LIMIT = 30 // requests per minute
-const BACKEND_URL = 'https://pdfforge-api.onrender.com' // Change to your backend
+const BACKEND_URL = 'https://pdfforge-3iaz.onrender.com' // Change to your backend
 
 // Simple in-memory rate limiter (will reset per worker restart)
 const rateLimitMap = new Map()
