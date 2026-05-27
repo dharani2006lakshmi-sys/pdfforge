@@ -462,4 +462,175 @@ export default function Tool() {
           width: 58, height: 58, borderRadius: 15,
           background: config.color + '22', border: `1px solid ${config.color}44`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '1.8rem', flexShrink: 0, boxShadow: `0 
+          fontSize: '1.8rem', flexShrink: 0, boxShadow: `0 4px 20px ${config.color}33`,
+        }}>{config.icon}</div>
+        <div>
+          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, marginBottom: 4 }}>{config.title}</h1>
+          <p style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>{config.desc}</p>
+          {config.note && <p style={{ color: config.color, fontSize: '0.8rem', marginTop: 4 }}>ℹ️ {config.note}</p>}
+        </div>
+      </div>
+
+      <StepBar step={step} color={config.color} />
+
+      {step === 0 && (
+        <div
+          {...getRootProps()}
+          style={{
+            border: `2px dashed ${isDragActive ? config.color : 'var(--border2)'}`,
+            borderRadius: 18, padding: '64px 32px', textAlign: 'center', cursor: 'pointer',
+            transition: 'all 0.22s', background: isDragActive ? config.color + '0d' : 'var(--surface)',
+          }}
+        >
+          <input {...getInputProps()} />
+          <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>📂</div>
+          <h3 style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: '1.1rem', marginBottom: 8 }}>
+            {isDragActive ? 'Drop your PDF here!' : `Click or drag ${config.multi ? 'PDFs' : 'a PDF'} here`}
+          </h3>
+          <p style={{ color: 'var(--muted)', fontSize: '0.82rem', marginBottom: 20 }}>
+            PDF files only · Max 50 MB · {config.multi ? 'Multiple files supported' : 'Single file'}
+          </p>
+          <button className="btn btn-primary" style={{ background: config.color, boxShadow: `0 6px 20px ${config.color}44`, pointerEvents: 'none' }}>
+            {config.icon} Choose PDF{config.multi ? 's' : ''}
+          </button>
+        </div>
+      )}
+
+      {step === 1 && files.length > 0 && (
+        <div>
+          {!config.multi && files[0] && <PDFMiniViewer file={files[0]} />}
+
+          {config.multi && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+              {files.map((f, i) => (
+                <div key={i} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: '1.2rem' }}>📄</span>
+                  <span style={{ flex: 1, fontWeight: 500, fontSize: '0.87rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                  <span style={{ color: 'var(--muted)', fontSize: '0.75rem', flexShrink: 0 }}>{formatBytes(f.size)}</span>
+                  <button onClick={() => removeFile(i)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', padding: '2px 6px', borderRadius: 6 }}
+                    onMouseEnter={e => e.currentTarget.style.color = 'var(--danger)'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}>✕</button>
+                </div>
+              ))}
+              <div {...getRootProps()} style={{ border: '2px dashed var(--border2)', borderRadius: 10, padding: '16px', textAlign: 'center', cursor: 'pointer', color: 'var(--muted)', fontSize: '0.85rem', background: isDragActive ? config.color + '0d' : 'transparent' }}>
+                <input {...getInputProps()} />
+                + Add more PDFs
+              </div>
+            </div>
+          )}
+
+          {config.controls.length > 0 && (
+            <div className="card" style={{ padding: '20px 22px', marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: '0.8rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: 4 }}>Options</div>
+              {config.controls.map(ctrl => (
+                <div key={ctrl.id} style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                  <label style={{ color: 'var(--text2)', fontSize: '0.84rem', fontWeight: 600, minWidth: 150 }}>{ctrl.label}</label>
+                  {ctrl.type === 'select' ? (
+                    <select className="input" style={{ maxWidth: 260 }} value={opts[ctrl.id]} onChange={e => setOpts(o => ({ ...o, [ctrl.id]: e.target.value }))}>
+                      {ctrl.options.map(op => <option key={op}>{op}</option>)}
+                    </select>
+                  ) : (
+                    <input className="input" type={ctrl.type || 'text'} placeholder={ctrl.placeholder} style={{ maxWidth: 280 }} value={opts[ctrl.id]} onChange={e => setOpts(o => ({ ...o, [ctrl.id]: e.target.value }))} />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {processing && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ height: 5, background: 'var(--border)', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: `linear-gradient(90deg, ${config.color}, #ff6b8a)`, borderRadius: 999, width: progress + '%', transition: 'width 0.4s ease' }} />
+              </div>
+              <p style={{ color: 'var(--muted)', fontSize: '0.78rem', marginTop: 6 }}>Processing... {progress}%</p>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={handleProcess} disabled={processing || files.length === 0}
+              style={{ background: config.color, boxShadow: `0 6px 20px ${config.color}44`, minWidth: 180 }}>
+              {processing ? <><div className="spinner" /> Processing…</> : <>{config.icon} Process Now</>}
+            </button>
+            <button className="btn btn-ghost" onClick={handleReset}>← Change file</button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && resultBlob && (
+        <div>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(0,229,160,0.08), rgba(56,196,247,0.06))',
+            border: '1px solid rgba(0,229,160,0.3)', borderRadius: 20, padding: '32px 28px', marginBottom: 24, textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '3rem', marginBottom: 12 }}>✅</div>
+            <h2 style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: '1.4rem', color: 'var(--success)', marginBottom: 6 }}>
+              Your PDF is ready!
+            </h2>
+            <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginBottom: 4 }}>
+              {config.title} completed successfully
+              {isZip && splitCount && splitCount > 1 && (
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}> · {splitCount} files zipped</span>
+              )}
+            </p>
+
+            <div style={{ display: 'inline-flex', gap: 24, marginTop: 16, marginBottom: 24, background: 'var(--surface2)', borderRadius: 12, padding: '12px 24px' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: 2 }}>ORIGINAL</div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{formatBytes(origSize)}</div>
+              </div>
+              <div style={{ width: 1, background: 'var(--border)' }} />
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: 2 }}>OUTPUT</div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--success)' }}>{formatBytes(resultBlob.size)}</div>
+              </div>
+              {toolId === 'compress' && origSize > 0 && resultBlob.size < origSize && (
+                <>
+                  <div style={{ width: 1, background: 'var(--border)' }} />
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: 2 }}>SAVED</div>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#00e5a0' }}>
+                      {(((origSize - resultBlob.size) / origSize) * 100).toFixed(1)}%
+                    </div>
+                  </div>
+                </>
+              )}
+              {splitCount && (
+                <>
+                  <div style={{ width: 1, background: 'var(--border)' }} />
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: 2 }}>CHUNKS</div>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{splitCount}</div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button className="btn btn-primary" onClick={handleDownload}
+                style={{ background: 'var(--success)', boxShadow: '0 6px 24px rgba(0,229,160,0.4)', fontSize: '1rem', padding: '14px 32px', gap: 10 }}>
+                {isZip ? '📦 Download ZIP (all pages)' : '⬇️ Download PDF'}
+              </button>
+              <button className="btn btn-ghost" onClick={handleReset} style={{ padding: '14px 24px' }}>
+                🔄 Process Another
+              </button>
+            </div>
+          </div>
+
+          <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+            <span style={{ color: 'var(--text2)', fontSize: '0.85rem' }}>🛠️ Need to do more with your PDF?</span>
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}>Browse all 29 tools →</button>
+          </div>
+
+          {!user && (
+            <div style={{ marginTop: 14, background: 'rgba(124,106,255,0.08)', border: '1px solid rgba(124,106,255,0.2)', borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+              <p style={{ color: 'var(--text2)', fontSize: '0.84rem' }}>
+                💡 <strong>Sign in</strong> to save your history and access files from anywhere.
+              </p>
+              <button className="btn btn-primary btn-sm" onClick={() => navigate('/register')}>Create free account →</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
