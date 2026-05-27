@@ -15,10 +15,18 @@ if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true })
 }
 
-// CORS - restrict to frontend domain
-const allowedOrigins = (process.env.ALLOWED_ORIGIN || 'http://localhost:5173').split(',')
+// CORS — set ALLOWED_ORIGIN in .env for production (comma-separated for multiple)
+// e.g. ALLOWED_ORIGIN=https://pdfforge.netlify.app,https://pdfforge.com
+const allowedOrigins = (process.env.ALLOWED_ORIGIN || 'http://localhost:5173,http://localhost:4173')
+  .split(',').map(o => o.trim()).filter(Boolean)
+
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, cb) => {
+    // Allow requests with no origin (curl, mobile apps, Postman)
+    if (!origin) return cb(null, true)
+    if (allowedOrigins.includes(origin)) return cb(null, true)
+    cb(new Error(`CORS: origin "${origin}" is not allowed. Add it to ALLOWED_ORIGIN in your .env`))
+  },
   credentials: true,
   methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
