@@ -19,7 +19,9 @@ export default function Register() {
     try {
       await registerEmail(email, password, name)
       toast.success('Account created! Welcome to PDFforge 🎉')
-      navigate('/dashboard')
+      const params = new URLSearchParams(window.location.search)
+      const returnTool = params.get('returnTool')
+      navigate(returnTool ? `/tool/${returnTool}` : '/dashboard')
     } catch (err) {
       toast.error(err.message.replace('Firebase: ', '').replace(/\(.*\)\.?/, ''))
     } finally { setLoading(false) }
@@ -29,7 +31,9 @@ export default function Register() {
     try {
       await loginGoogle()
       toast.success('Welcome to PDFforge! 🎉')
-      navigate('/dashboard')
+      const params = new URLSearchParams(window.location.search)
+      const returnTool = params.get('returnTool')
+      navigate(returnTool ? `/tool/${returnTool}` : '/dashboard')
     } catch (err) {
       if (err.code !== 'auth/popup-closed-by-user') toast.error('Google sign-in failed')
     }
