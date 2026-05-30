@@ -472,7 +472,119 @@ export async function overlayPDFs(baseFilePath, overlayFilePath) {
     const embedded = await basePdf.embedPage(overlayPages[overlayIdx])
     const { width, height } = basePages[i].getSize()
     basePages[i].drawPage(embedded, { x:0, y:0, width, height, opacity:0.5 })
-  }
   return basePdf.save()
+}
+
+// ─── 31. Image to PDF ────────────────────────────────────────────────────────
+export async function imageToPDF(filePaths) {
+  const pdf = await PDFDocument.create()
+  for (const fp of filePaths) {
+    const bytes = readPDF(fp)
+    let image
+    try {
+      image = await pdf.embedPng(bytes)
+    } catch (e) {
+      image = await pdf.embedJpg(bytes)
+    }
+    const { width, height } = image.scale(1)
+    const page = pdf.addPage([width, height])
+    page.drawImage(image, { x: 0, y: 0, width, height })
+  }
+  return pdf.save()
+}
+
+// ─── 32. Add Background ──────────────────────────────────────────────────────
+export async function addBackground(filePath, color = 'White') {
+  const pdf = await PDFDocument.load(readPDF(filePath))
+  const colorMap = {
+    'White': rgb(1, 1, 1),
+    'Light Gray': rgb(0.9, 0.9, 0.9),
+    'Cream': rgb(1, 0.99, 0.82),
+    'Light Blue': rgb(0.88, 0.95, 1),
+    'Light Yellow': rgb(1, 1, 0.88)
+  }
+  const col = colorMap[color] || rgb(1, 1, 1)
+  const out = await PDFDocument.create()
+  for (const page of pdf.getPages()) {
+    const { width, height } = page.getSize()
+    const newPage = out.addPage([width, height])
+    newPage.drawRectangle({ x: 0, y: 0, width, height, color: col })
+    const embedded = await out.embedPage(page)
+    newPage.drawPage(embedded, { x: 0, y: 0, width, height })
+  }
+  return out.save()
+}
+
+// ─── 33. Custom Academic Page Numbers ──────────────────────────────────────────
+function toRoman(num) {
+  const lookup = {M:1000,CM:900,D:500,CD:400,C:100,XC:90,L:50,XL:40,X:10,IX:9,V:5,IV:4,I:1};
+  let roman = '';
+  for (let i in lookup) {
+    while (num >= lookup[i]) {
+      roman += i;
+      num -= lookup[i];
+    }
+  }
+  return roman.toLowerCase();
+}
+
+export async function addAcademicPageNumbers(filePath, options) {
+  const pdf = await PDFDocument.load(readPDF(filePath))
+  const fontMap = {
+    'Helvetica': StandardFonts.Helvetica,
+    'Times Roman': StandardFonts.TimesRoman,
+    'Courier': StandardFonts.Courier
+  }
+  const fontToUse = fontMap[options.fontFamily] || StandardFonts.Helvetica
+  const font = await pdf.embedFont(fontToUse)
+  
+  const colorMap = {
+    'Black': rgb(0,0,0),
+    'Gray': rgb(0.4,0.4,0.4),
+    'Red': rgb(1,0,0),
+    'Blue': rgb(0,0,1)
+  }
+  const color = colorMap[options.fontColor] || rgb(0,0,0)
+  
+  const rStart = parseInt(options.romanStart) || 2
+  const rEnd = parseInt(options.romanEnd) || 8
+  const aStart = parseInt(options.arabicStart) || 9
+  const aEnd = parseInt(options.arabicEnd) || 1000
+  const aStartVal = parseInt(options.arabicStartValue) || 1
+  const fSize = parseInt(options.fontSize) || 12
+  const margin = parseInt(options.margin) || 30
+  const pos = options.position || 'Bottom Center'
+
+  const pages = pdf.getPages()
+  
+  for (let i = 1; i < pages.length; i++) { // Skip index 0 (page 1)
+    const pageNum = i + 1
+    let textToDraw = ''
+    
+    if (pageNum >= rStart && pageNum <= rEnd) {
+      textToDraw = toRoman(pageNum - rStart + 1)
+    } else if (pageNum >= aStart && pageNum <= aEnd) {
+      textToDraw = String(pageNum - aStart + aStartVal)
     }
     
+    if (textToDraw) {
+      const page = pages[i]
+      const { width, height } = page.getSize()
+      const textWidth = font.widthOfTextAtSize(textToDraw, fSize)
+      const textHeight = font.heightAtSize(fSize)
+      
+      let x = width / 2 - textWidth / 2
+      let y = margin
+      
+      if (pos.includes('Left')) x = margin
+      if (pos.includes('Right')) x = width - margin - textWidth
+      if (pos.includes('Top')) y = height - margin - textHeight
+      
+      page.drawText(textToDraw, {
+        x, y, size: fSize, font, color
+      })
+    }
+  }
+  return pdf.save()
+}
+
