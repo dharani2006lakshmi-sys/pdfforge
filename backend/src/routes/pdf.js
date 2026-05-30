@@ -1,4 +1,5 @@
 import express from 'express'
+import * as advancedPdf from '../services/advancedPdfService.js'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
@@ -22,7 +23,9 @@ const upload = multer({
   limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE || '52428800') },
   fileFilter: (req, file, cb) => {
     const isPDF = file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf')
-    if (!isPDF) return cb(new Error('Only PDF files are allowed. The file you uploaded is not a valid PDF.'))
+    const isImage = file.mimetype.startsWith('image/') || file.originalname.match(/\.(png|jpe?g)$/i)
+    const isWord = file.originalname.match(/\.(docx)$/i)
+    if (!isPDF && !isImage && !isWord) return cb(new Error('Only PDF, image, and Word files are allowed.'))
     cb(null, true)
   },
 })
@@ -191,6 +194,33 @@ router.post('/process', optionalAuth, upload.any(), async (req, res) => {
         if (filePaths.length < 2) return res.status(400).json({ error: 'Upload base PDF first, then overlay PDF (2 files required)' })
         result = await pdf.overlayPDFs(filePaths[0], filePaths[1])
         break
+      case 'img2pdf':
+        if (filePaths.length === 0) return res.status(400).json({ error: 'Upload at least one image' })
+        result = await pdf.imageToPDF(filePaths)
+        break
+      case 'background':
+        result = await pdf.addBackground(filePaths[0], options.color || 'White')
+        break
+      case 'academicpagenumbers':
+        result = await pdf.addAcademicPageNumbers(filePaths[0], options)
+        break
+      case 'word2pdf':
+        if (filePaths.length === 0) return res.status(400).json({ error: 'Upload a word document' })
+        result = await advancedPdf.word2pdf(filePaths[0])
+        break
+      case 'pdf2word':
+        result = await advancedPdf.pdf2word(filePaths[0])
+        break
+      case 'pdf2excel':
+        result = await advancedPdf.pdf2excel(filePaths[0])
+        break
+      case 'pdf2ppt':
+        result = await advancedPdf.pdf2ppt(filePaths[0])
+        break
+      case 'html2pdf':
+        if (!options.url) return res.status(400).json({ error: 'URL is required' })
+        result = await advancedPdf.html2pdf(options.url)
+        break
       default:
         return res.status(400).json({ error: `Unknown tool: "${tool}"` })
     }
@@ -209,15 +239,23 @@ router.post('/process', optionalAuth, upload.any(), async (req, res) => {
 
     if (isSplit && Array.isArray(result)) {
       if (result.length === 1) {
-        res.setHeader('Content-Type', 'application/pdf')
-        res.setHeader('Content-Disposition', `attachment; filename="${tool}_${Date.now()}.pdf"`)
+        const ext = tool === 'pdf2img' ? 'png' : 'pdf'
+        const mime = tool === 'pdf2img' ? 'image/png' : 'application/pdf'
+        res.setHeader('Content-Type', mime)
+        res.setHeader('Content-Disposition', `attachment; filename="${tool}_${Date.now()}.${ext}"`)
         res.setHeader('X-Split-Count', '1')
         return res.send(Buffer.from(result[0]))
       }
       await sendZip(res, result, `${tool}_${Date.now()}`)
     } else {
-      res.setHeader('Content-Type', 'application/pdf')
-      res.setHeader('Content-Disposition', `attachment; filename="${tool}_${Date.now()}.pdf"`)
+      let ext = 'pdf'
+      let mime = 'application/pdf'
+      if (tool === 'pdf2word') { ext = 'docx'; mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }
+      if (tool === 'pdf2excel') { ext = 'xlsx'; mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+      if (tool === 'pdf2ppt') { ext = 'pptx'; mime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }
+
+      res.setHeader('Content-Type', mime)
+      res.setHeader('Content-Disposition', `attachment; filename="${tool}_${Date.now()}.${ext}"`)
       res.send(Buffer.from(result))
     }
 
