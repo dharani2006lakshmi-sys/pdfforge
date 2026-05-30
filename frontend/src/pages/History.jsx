@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { getUserHistory, deleteFile, getSignedUrl } from '../utils/supabase.js'
 import toast from 'react-hot-toast'
+
+const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 function formatDate(d) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -14,18 +15,24 @@ function formatBytes(b) {
 }
 
 export default function History() {
-  const { user } = useAuth()
+  const { user, getToken } = useAuth()
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(null)
 
   useEffect(() => {
-    loadHistory()
+    if (user) loadHistory()
+    else setLoading(false)
   }, [user])
 
   const loadHistory = async () => {
     try {
-      const data = await getUserHistory(user.uid, 50)
+      const token = await getToken()
+      const res = await fetch(`${BASE}/api/pdf/files/history`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error('Failed to fetch')
+      const data = await res.json()
       setHistory(data || [])
     } catch (err) {
       toast.error('Failed to load history')
@@ -37,7 +44,12 @@ export default function History() {
   const handleDelete = async (id, path) => {
     setDeleting(id)
     try {
-      await deleteFile(path)
+      const token = await getToken()
+      const res = await fetch(`${BASE}/api/pdf/files/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error('Delete failed')
       setHistory(h => h.filter(x => x.id !== id))
       toast.success('File deleted')
     } catch (err) {
@@ -47,9 +59,14 @@ export default function History() {
     }
   }
 
-  const handleDownload = async (path, filename) => {
+  const handleDownload = async (id, filename) => {
     try {
-      const url = await getSignedUrl(path)
+      const token = await getToken()
+      const res = await fetch(`${BASE}/api/pdf/files/${id}/url`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error('Download failed')
+      const { url } = await res.json()
       const a = document.createElement('a')
       a.href = url
       a.download = filename
@@ -105,7 +122,7 @@ export default function History() {
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   className="btn btn-ghost btn-sm"
-                  onClick={() => handleDownload(item.result_path, item.original_filename)}
+                  onClick={() => handleDownload(item.id, item.original_filename)}
                 >
                   ⬇️ Download
                 </button>
