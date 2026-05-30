@@ -18,7 +18,9 @@ export default function Login() {
     try {
       await loginEmail(email, password)
       toast.success('Welcome back!')
-      navigate('/dashboard')
+      const params = new URLSearchParams(window.location.search)
+      const returnTool = params.get('returnTool')
+      navigate(returnTool ? `/tool/${returnTool}` : '/dashboard')
     } catch (err) {
       toast.error(err.message.replace('Firebase: ', '').replace(/\(.*\)\.?/, ''))
     } finally { setLoading(false) }
@@ -29,7 +31,9 @@ export default function Login() {
     try {
       await loginGoogle()
       toast.success('Welcome back!')
-      navigate('/dashboard')
+      const params = new URLSearchParams(window.location.search)
+      const returnTool = params.get('returnTool')
+      navigate(returnTool ? `/tool/${returnTool}` : '/dashboard')
     } catch (err) {
       if (err.code !== 'auth/popup-closed-by-user')
         toast.error('Google sign-in failed')
