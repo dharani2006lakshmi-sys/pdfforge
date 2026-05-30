@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import { useAuth } from '../hooks/useAuth.jsx'
 import toast from 'react-hot-toast'
+import { pendingFiles, pendingTool, setPendingFiles, clearPendingFiles } from '../utils/pendingUpload.js'
 
 // ─── TOOL CONFIG ──────────────────────────────────────────────────────────────
 // IDs must match backend switch cases in routes/pdf.js
@@ -29,7 +30,7 @@ export const TOOL_CONFIG = {
   watermark:   { title: 'Add Watermark',     icon: '💧', desc: 'Stamp text onto every page.',                   multi: false, color: '#ffb347', category: 'Edit', controls: [{ id: 'text', label: 'Watermark text', type: 'text', placeholder: 'CONFIDENTIAL' }, { id: 'opacity', label: 'Opacity', type: 'select', options: ['Light (20%)', 'Medium (35%)', 'Strong (50%)'] }, { id: 'color', label: 'Color', type: 'select', options: ['Gray', 'Red', 'Blue', 'Green', 'Black', 'Orange'] }] },
   stamp:       { title: 'Stamp PDF',         icon: '🔖', desc: 'Apply a visible stamp to every page.',          multi: false, color: '#ff4d6d', category: 'Edit', controls: [{ id: 'stamp', label: 'Stamp text', type: 'select', options: ['APPROVED', 'REJECTED', 'DRAFT', 'CONFIDENTIAL', 'FINAL', 'PENDING'] }] },
   pagenumbers: { title: 'Page Numbers',      icon: '🔢', desc: 'Automatically number every page.',              multi: false, color: '#38c4f7', category: 'Edit', controls: [{ id: 'position', label: 'Position', type: 'select', options: ['Bottom Center', 'Bottom Right', 'Bottom Left'] }, { id: 'startnum', label: 'Start from', type: 'text', placeholder: '1' }] },
-  KRCTReport: { title: 'Custom Page Numbering', icon: '🎓', desc: 'Advanced numbering for academic and project reports.', multi: false, color: '#38c4f7', category: 'Edit', controls: [
+  academicpagenumbers: { title: 'Custom Page Numbering', icon: '🎓', desc: 'Advanced numbering for academic and project reports.', multi: false, color: '#38c4f7', category: 'Edit', controls: [
     { id: 'romanStart', label: 'Roman Start Page', type: 'text', placeholder: '2' },
     { id: 'romanEnd', label: 'Roman End Page', type: 'text', placeholder: '8' },
     { id: 'arabicStart', label: 'Arabic Start Page', type: 'text', placeholder: '9' },
@@ -315,17 +316,36 @@ export default function Tool() {
   const isImgTool = toolId === 'img2pdf'
   const isWordTool = toolId === 'word2pdf'
 
+  // Retrieve pending files if they just logged in
+  useEffect(() => {
+    if (user && pendingFiles.length > 0 && pendingTool === toolId) {
+      if (config?.multi) setFiles(prev => [...prev, ...pendingFiles])
+      else setFiles([pendingFiles[0]])
+      setStep(1)
+      clearPendingFiles()
+    }
+  }, [user, toolId, config])
+
   const onDrop = useCallback((accepted, rejected) => {
     rejected?.forEach(({ file, errors }) => {
       if (errors.some(e => e.code === 'file-too-large')) toast.error(`"${file.name}" exceeds the 50 MB limit.`)
       else toast.error(`"${file.name}" could not be accepted.`)
     })
     if (!accepted.length) return
+    
+    // Intercept guests
+    if (!user) {
+      setPendingFiles(accepted, toolId)
+      toast('Please sign in to continue with your file', { icon: '👋' })
+      navigate(`/login?returnTool=${toolId}`)
+      return
+    }
+
     if (config?.multi) setFiles(prev => [...prev, ...accepted])
     else setFiles([accepted[0]])
     setResultBlob(null)
     setStep(1)
-  }, [config])
+  }, [config, user, toolId, navigate])
 
   const acceptMap = isImgTool
     ? { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'] }
