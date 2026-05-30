@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { saveHistory } from '../utils/supabase.js'
 import toast from 'react-hot-toast'
 
 // ─── TOOL CONFIG ──────────────────────────────────────────────────────────────
@@ -26,11 +25,22 @@ export const TOOL_CONFIG = {
   grayscale:   { title: 'Grayscale PDF',     icon: '🖤', desc: 'Convert PDF to black & white.',                  multi: false, color: '#a8a8c4', category: 'Optimize', controls: [] },
   linearize:   { title: 'Fast Web View',     icon: '⚡', desc: 'Optimize PDF for fast browser loading.',         multi: false, color: '#00e5a0', category: 'Optimize', controls: [] },
   splitbypages:{ title: 'Split by Size',     icon: '📦', desc: 'Break PDF into chunks of N pages each.',        multi: false, color: '#ff4d6d', category: 'Optimize', controls: [{ id: 'pagesperchunk', label: 'Pages per chunk', type: 'text', placeholder: '5' }] },
-  repair:      { title: 'Repair PDF',        icon: '🔧', desc: 'Attempt to fix and recover corrupted PDFs.',    multi: false, color: '#ffb347', category: 'Optimize', controls: [] },
   // Edit
   watermark:   { title: 'Add Watermark',     icon: '💧', desc: 'Stamp text onto every page.',                   multi: false, color: '#ffb347', category: 'Edit', controls: [{ id: 'text', label: 'Watermark text', type: 'text', placeholder: 'CONFIDENTIAL' }, { id: 'opacity', label: 'Opacity', type: 'select', options: ['Light (20%)', 'Medium (35%)', 'Strong (50%)'] }, { id: 'color', label: 'Color', type: 'select', options: ['Gray', 'Red', 'Blue', 'Green', 'Black', 'Orange'] }] },
   stamp:       { title: 'Stamp PDF',         icon: '🔖', desc: 'Apply a visible stamp to every page.',          multi: false, color: '#ff4d6d', category: 'Edit', controls: [{ id: 'stamp', label: 'Stamp text', type: 'select', options: ['APPROVED', 'REJECTED', 'DRAFT', 'CONFIDENTIAL', 'FINAL', 'PENDING'] }] },
   pagenumbers: { title: 'Page Numbers',      icon: '🔢', desc: 'Automatically number every page.',              multi: false, color: '#38c4f7', category: 'Edit', controls: [{ id: 'position', label: 'Position', type: 'select', options: ['Bottom Center', 'Bottom Right', 'Bottom Left'] }, { id: 'startnum', label: 'Start from', type: 'text', placeholder: '1' }] },
+  KRCTReport: { title: 'Custom Page Numbering', icon: '🎓', desc: 'Advanced numbering for academic and project reports.', multi: false, color: '#38c4f7', category: 'Edit', controls: [
+    { id: 'romanStart', label: 'Roman Start Page', type: 'text', placeholder: '2' },
+    { id: 'romanEnd', label: 'Roman End Page', type: 'text', placeholder: '8' },
+    { id: 'arabicStart', label: 'Arabic Start Page', type: 'text', placeholder: '9' },
+    { id: 'arabicEnd', label: 'Arabic End Page', type: 'text', placeholder: '39' },
+    { id: 'arabicStartValue', label: 'Arabic Starts At', type: 'text', placeholder: '1' },
+    { id: 'position', label: 'Position', type: 'select', options: ['Bottom Center', 'Top Left', 'Top Center', 'Top Right', 'Bottom Left', 'Bottom Right'] },
+    { id: 'fontFamily', label: 'Font Family', type: 'select', options: ['Helvetica', 'Times Roman', 'Courier'] },
+    { id: 'fontSize', label: 'Font Size', type: 'text', placeholder: '12' },
+    { id: 'fontColor', label: 'Font Color', type: 'select', options: ['Black', 'Gray', 'Red', 'Blue'] },
+    { id: 'margin', label: 'Margin from Edge', type: 'text', placeholder: '30' }
+  ] },
   // Home uses id='header' but backend uses 'headerfooter' — we map it:
   header:      { title: 'Header & Footer',   icon: '📌', desc: 'Add header and footer text to every page.',     multi: false, color: '#ff6bc8', category: 'Edit', controls: [{ id: 'header', label: 'Header text', type: 'text', placeholder: 'My Company' }, { id: 'footer', label: 'Footer text', type: 'text', placeholder: 'Confidential' }], backendTool: 'headerfooter' },
   headerfooter:{ title: 'Header & Footer',   icon: '📋', desc: 'Add header and footer text to every page.',     multi: false, color: '#7c6aff', category: 'Edit', controls: [{ id: 'header', label: 'Header text', type: 'text', placeholder: 'My Company' }, { id: 'footer', label: 'Footer text', type: 'text', placeholder: 'Confidential' }] },
@@ -39,24 +49,18 @@ export const TOOL_CONFIG = {
   addline:     { title: 'Draw Line',         icon: '📏', desc: 'Draw a horizontal or diagonal line on a page.',  multi: false, color: '#00e5a0', category: 'Edit', controls: [{ id: 'pagenum', label: 'Page', type: 'text', placeholder: '1' }, { id: 'x1', label: 'X1', type: 'text', placeholder: '50' }, { id: 'y1', label: 'Y1', type: 'text', placeholder: '300' }, { id: 'x2', label: 'X2', type: 'text', placeholder: '500' }, { id: 'y2', label: 'Y2', type: 'text', placeholder: '300' }, { id: 'color', label: 'Color', type: 'select', options: ['Black', 'Red', 'Blue', 'Green', 'Gray'] }] },
   metadata:    { title: 'Edit Metadata',     icon: '📝', desc: 'Change title, author, subject, keywords.',       multi: false, color: '#ff6bc8', category: 'Edit', controls: [{ id: 'title', label: 'Title', type: 'text', placeholder: 'Document title' }, { id: 'author', label: 'Author', type: 'text', placeholder: 'Author name' }, { id: 'subject', label: 'Subject', type: 'text', placeholder: 'Subject' }, { id: 'keywords', label: 'Keywords', type: 'text', placeholder: 'keyword1, keyword2' }, { id: 'creator', label: 'Creator', type: 'text', placeholder: 'Creator app' }] },
   addbookmark: { title: 'Add Bookmarks',     icon: '🔖', desc: 'Label specific pages with bookmark tags.',       multi: false, color: '#7c6aff', category: 'Edit', controls: [{ id: 'bookmarks', label: 'Bookmarks (JSON)', type: 'text', placeholder: '[{"title":"Intro","page":1}]' }] },
-  annotate:    { title: 'Annotate PDF',      icon: '✏️', desc: 'Add comments and highlights to your PDF.',       multi: false, color: '#ffb347', category: 'Edit', controls: [{ id: 'text', label: 'Comment text', type: 'text', placeholder: 'Your annotation...' }, { id: 'pagenum', label: 'Page', type: 'text', placeholder: '1' }] },
-  fillform:    { title: 'Fill Forms',        icon: '📋', desc: 'Fill in PDF form fields online.',                 multi: false, color: '#00e5a0', category: 'Edit', controls: [] },
   background:  { title: 'Add Background',    icon: '🎨', desc: 'Insert a color background on every page.',        multi: false, color: '#a0e5ff', category: 'Edit', controls: [{ id: 'color', label: 'Background color', type: 'select', options: ['White', 'Light Gray', 'Cream', 'Light Blue', 'Light Yellow'] }] },
   // Security
   protect:     { title: 'Protect PDF',       icon: '🔒', desc: 'Lock your PDF with a password.',                 multi: false, color: '#ff4d6d', category: 'Security', controls: [{ id: 'password', label: 'Password', type: 'password', placeholder: 'Enter a strong password' }], note: '⚠️ Adds metadata-level protection.' },
   unlock:      { title: 'Unlock PDF',        icon: '🔓', desc: 'Remove password protection from a PDF.',         multi: false, color: '#7c6aff', category: 'Security', controls: [] },
   flatten:     { title: 'Flatten PDF',       icon: '🗂️', desc: 'Remove form fields and annotations.',            multi: false, color: '#38c4f7', category: 'Security', controls: [] },
-  redact:      { title: 'Redact PDF',        icon: '⬛', desc: 'Permanently hide sensitive text from your PDF.', multi: false, color: '#ff4d6d', category: 'Security', controls: [{ id: 'text', label: 'Text to redact', type: 'text', placeholder: 'e.g. John Doe, SSN' }] },
-  sign:        { title: 'Sign PDF',          icon: '✍️', desc: 'Add a digital signature to your PDF.',           multi: false, color: '#00e5a0', category: 'Security', controls: [{ id: 'name', label: 'Signature name', type: 'text', placeholder: 'Your full name' }, { id: 'pagenum', label: 'Page', type: 'text', placeholder: '1' }, { id: 'position', label: 'Position', type: 'select', options: ['Bottom Right', 'Bottom Left', 'Bottom Center'] }] },
   // Convert
-  pdf2img:     { title: 'PDF to Image',      icon: '🖼️', desc: 'Export each PDF page as a PNG or JPG image.',   multi: false, color: '#38c4f7', category: 'Convert', controls: [{ id: 'format', label: 'Image format', type: 'select', options: ['PNG', 'JPG'] }] },
   img2pdf:     { title: 'Image to PDF',      icon: '📸', desc: 'Convert JPG/PNG images into a PDF.',             multi: true,  color: '#7c6aff', category: 'Convert', controls: [], note: 'Upload JPG or PNG image files.' },
   pdf2word:    { title: 'PDF to Word',       icon: '📄', desc: 'Export your PDF as an editable .docx file.',     multi: false, color: '#ff6bc8', category: 'Convert', controls: [] },
   word2pdf:    { title: 'Word to PDF',       icon: '📃', desc: 'Convert a .docx Word document into a PDF.',      multi: false, color: '#ffb347', category: 'Convert', controls: [], note: 'Upload a .docx file.' },
   pdf2excel:   { title: 'PDF to Excel',      icon: '📊', desc: 'Extract tables from your PDF into a spreadsheet.',multi: false, color: '#00e5a0', category: 'Convert', controls: [] },
   pdf2ppt:     { title: 'PDF to PPT',        icon: '📑', desc: 'Convert PDF slides into a PowerPoint file.',     multi: false, color: '#c4b5ff', category: 'Convert', controls: [] },
   html2pdf:    { title: 'HTML to PDF',       icon: '🌐', desc: 'Snapshot a webpage as a PDF.',                   multi: false, color: '#38c4f7', category: 'Convert', controls: [{ id: 'url', label: 'Webpage URL', type: 'text', placeholder: 'https://example.com' }] },
-  ocr:         { title: 'OCR PDF',           icon: '🔍', desc: 'Make scanned PDFs searchable with OCR.',         multi: false, color: '#7c6aff', category: 'Convert', controls: [{ id: 'language', label: 'Language', type: 'select', options: ['English', 'Spanish', 'French', 'German', 'Hindi'] }] },
   // Advanced
   overlay:     { title: 'Overlay PDFs',      icon: '🗃️', desc: 'Overlay one PDF on top of another.',             multi: true,  color: '#ff6bc8', category: 'Advanced', controls: [], note: 'Upload base PDF first, then overlay PDF.' },
 }
@@ -67,6 +71,18 @@ function formatBytes(b) {
   if (b < 1024) return b + ' B'
   if (b < 1048576) return (b / 1024).toFixed(1) + ' KB'
   return (b / 1048576).toFixed(2) + ' MB'
+}
+
+function toRoman(num) {
+  const lookup = {M:1000,CM:900,D:500,CD:400,C:100,XC:90,L:50,XL:40,X:10,IX:9,V:5,IV:4,I:1};
+  let roman = '';
+  for (let i in lookup) {
+    while (num >= lookup[i]) {
+      roman += i;
+      num -= lookup[i];
+    }
+  }
+  return roman.toLowerCase();
 }
 
 async function ensurePdfJs() {
@@ -82,7 +98,7 @@ async function ensurePdfJs() {
 }
 
 // ─── PDF VIEWER ───────────────────────────────────────────────────────────────
-function PDFViewer({ source, label, accentColor = '#7c6aff', maxHeight = 360 }) {
+function PDFViewer({ source, label, accentColor = '#7c6aff', maxHeight = 360, toolId, opts }) {
   const canvasRef = useRef(null)
   const renderTaskRef = useRef(null)
   const [pdfDoc, setPdfDoc] = useState(null)
@@ -90,12 +106,22 @@ function PDFViewer({ source, label, accentColor = '#7c6aff', maxHeight = 360 }) 
   const [totalPages, setTotalPages] = useState(0)
   const [loading, setLoading] = useState(true)
   const [rendering, setRendering] = useState(false)
+  const [imageUrl, setImageUrl] = useState(null)
+  const isImage = source?.type?.startsWith('image/') || source?.name?.match(/\.(png|jpe?g)$/i)
 
   // Load document
   useEffect(() => {
     if (!source) return
     let cancelled = false
-    setLoading(true); setCurrentPage(1); setPdfDoc(null); setTotalPages(0)
+    setLoading(true); setCurrentPage(1); setPdfDoc(null); setTotalPages(0); setImageUrl(null)
+    
+    if (isImage) {
+      const url = URL.createObjectURL(source)
+      setImageUrl(url)
+      setLoading(false)
+      return () => { URL.revokeObjectURL(url) }
+    }
+
     ;(async () => {
       try {
         await ensurePdfJs()
@@ -108,7 +134,7 @@ function PDFViewer({ source, label, accentColor = '#7c6aff', maxHeight = 360 }) 
       finally { if (!cancelled) setLoading(false) }
     })()
     return () => { cancelled = true }
-  }, [source])
+  }, [source, isImage])
 
   // Render current page
   useEffect(() => {
@@ -129,11 +155,56 @@ function PDFViewer({ source, label, accentColor = '#7c6aff', maxHeight = 360 }) 
         const task = page.render({ canvasContext: canvas.getContext('2d'), viewport: vp })
         renderTaskRef.current = task
         await task.promise
+
+        // Draw custom academic page numbers overlay
+        if (toolId === 'academicpagenumbers' && opts) {
+          const ctx = canvas.getContext('2d')
+          const w = canvas.width
+          const h = canvas.height
+          const pageNum = currentPage
+          
+          if (pageNum > 1) { // Skip page 1
+            const rStart = parseInt(opts.romanStart) || 2
+            const rEnd = parseInt(opts.romanEnd) || 8
+            const aStart = parseInt(opts.arabicStart) || 9
+            const aEnd = parseInt(opts.arabicEnd) || 1000
+            const aStartVal = parseInt(opts.arabicStartValue) || 1
+            
+            let textToDraw = ''
+            if (pageNum >= rStart && pageNum <= rEnd) {
+              textToDraw = toRoman(pageNum - rStart + 1)
+            } else if (pageNum >= aStart && pageNum <= aEnd) {
+              textToDraw = String(pageNum - aStart + aStartVal)
+            }
+            
+            if (textToDraw) {
+              ctx.save()
+              const fSize = parseInt(opts.fontSize) || 12
+              ctx.font = `${fSize * scale}px ${opts.fontFamily || 'Helvetica'}`
+              
+              const colorMap = { 'Black': '#000', 'Gray': '#666', 'Red': '#ff0000', 'Blue': '#0000ff' }
+              ctx.fillStyle = colorMap[opts.fontColor] || '#000'
+              ctx.textAlign = 'center'
+              ctx.textBaseline = 'middle'
+              
+              const m = (parseInt(opts.margin) || 30) * scale
+              let x = w / 2
+              let y = h - m
+              const pos = opts.position || 'Bottom Center'
+              if (pos.includes('Left')) { x = m; ctx.textAlign = 'left' }
+              if (pos.includes('Right')) { x = w - m; ctx.textAlign = 'right' }
+              if (pos.includes('Top')) { y = m }
+              
+              ctx.fillText(textToDraw, x, y)
+              ctx.restore()
+            }
+          }
+        }
       } catch (e) { if (e?.name !== 'RenderingCancelledException') console.error('Render:', e) }
       finally { if (!cancelled) setRendering(false) }
     })()
     return () => { cancelled = true }
-  }, [pdfDoc, currentPage])
+  }, [pdfDoc, currentPage, toolId, opts])
 
   const goTo = n => setCurrentPage(Math.max(1, Math.min(totalPages, n)))
   const name = source?.name || label || 'document.pdf'
@@ -159,6 +230,8 @@ function PDFViewer({ source, label, accentColor = '#7c6aff', maxHeight = 360 }) 
             <div className="spinner" style={{ width: 20, height: 20 }} />
             Loading preview…
           </div>
+        ) : isImage && imageUrl ? (
+          <img src={imageUrl} alt="Preview" style={{ display: 'block', maxWidth: '100%', maxHeight: maxHeight - 20, borderRadius: 4, objectFit: 'contain' }} />
         ) : (
           <div style={{ position: 'relative' }}>
             {rendering && (
@@ -326,9 +399,6 @@ export default function Tool() {
       setIsZip(zipResult)
       setStep(2)
 
-      if (user) {
-        await saveHistory({ user_id: user.uid, tool_used: toolId, original_filename: files[0]?.name, file_size: blob.size }).catch(() => {})
-      }
       toast.success('✅ Processed successfully!')
     } catch (err) {
       toast.error(err.message || 'Processing failed. Please try again.')
@@ -395,7 +465,7 @@ export default function Tool() {
         <div>
           {/* Single file preview */}
           {!config.multi && files[0] && (
-            <PDFViewer source={files[0]} accentColor={config.color} maxHeight={300} />
+            <PDFViewer source={files[0]} accentColor={config.color} maxHeight={300} toolId={toolId} opts={opts} />
           )}
 
           {/* Multi file previews */}
@@ -406,7 +476,7 @@ export default function Tool() {
               </div>
               {files.map((f, i) => (
                 <div key={i} style={{ position: 'relative' }}>
-                  <PDFViewer source={f} accentColor={config.color} maxHeight={260} />
+                  <PDFViewer source={f} accentColor={config.color} maxHeight={260} toolId={toolId} opts={opts} />
                   <button onClick={() => removeFile(i)}
                     style={{ position: 'absolute', top: 10, right: 14, zIndex: 10, background: 'rgba(255,77,109,0.15)', border: '1px solid rgba(255,77,109,0.4)', color: '#ff4d6d', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: 6 }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,77,109,0.3)'}
